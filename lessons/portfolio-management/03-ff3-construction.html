@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-Hant" data-root="../../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fama-French 3 Factors Construction｜投資組合管理｜商學院講義庫</title>
+  <meta name="description" content="實作：用 CRSP 與 Compustat 資料親手做出 SMB 與 HML">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+  <link rel="stylesheet" href="../../assets/css/style.css">
+  <script src="../../assets/js/catalog.js" defer></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="page-lesson" data-course="portfolio-management" data-lesson="ipm-03">
+  <header id="site-header"></header>
+
+  <main class="lesson-layout">
+    <article class="lesson">
+      <nav id="breadcrumb" class="breadcrumb" aria-label="麵包屑"></nav>
+
+      <header class="lesson-header">
+        <p class="lesson-kicker">IPM · Lecture 03 · Week 9 Python Application</p>
+        <h1>Fama-French 3 Factors Construction</h1>
+        <p class="lesson-subtitle">實作：用 CRSP 與 Compustat 資料親手做出 SMB 與 HML</p>
+        <dl class="lesson-meta">
+          <div><dt>先備知識</dt><dd>第 01 講第 6 節、Python pandas 基礎</dd></div>
+          <div><dt>閱讀時間</dt><dd>約 35 分鐘</dd></div>
+          <div><dt>最後更新</dt><dd>2026-11-10</dd></div>
+        </dl>
+        <p class="source-note">內容來源：Investment &amp; Portfolio Management（Douglas Chung，國立政治大學）Week 9 Python Application「Fama-French 3 factor model」。本頁為學習筆記，以自己的文字與程式重新整理。</p>
+      </header>
+
+      <section id="objectives" class="lesson-section">
+        <h2>學習目標</h2>
+        <ol>
+          <li>能夠說明 FF3 因子建構所需的資料欄位，以及市值與帳面市值比的定義。</li>
+          <li>能夠說明為什麼在每年 6 月底排序、持有到隔年 6 月，以及如何避免前視偏誤。</li>
+          <li>能夠用 NYSE 分界點完成 2×3 非條件雙變數排序，並計算六個市值加權投資組合的報酬。</li>
+          <li>能夠由六個投資組合手算並用 pandas 計算 SMB 與 HML。</li>
+          <li>能夠把複製結果與 Kenneth French 官方因子比較，並解讀 FF3 迴歸係數。</li>
+        </ol>
+      </section>
+
+      <section id="content" class="lesson-section">
+        <h2 id="s1-goal-and-data">1. 目標與資料</h2>
+        <p>第 01 講介紹了 FF3 模型的「長相」，這一講要真的把它做出來：從個股資料出發，一步步建構出規模因子 SMB 與價值因子 HML，最後和 Fama-French 官方公布的因子比較，確認做得對不對。</p>
+
+        <div class="table-wrap">
+          <table>
+            <caption>表 3.1　需要的資料欄位</caption>
+            <thead><tr><th>欄位</th><th>來源</th><th>意義</th></tr></thead>
+            <tbody>
+              <tr><td><code>PERMNO</code></td><td>CRSP</td><td>股票的永久代碼（不會因改名或換代號而改變）</td></tr>
+              <tr><td><code>date</code></td><td>CRSP</td><td>月底日期</td></tr>
+              <tr><td><code>EXCHCD</code></td><td>CRSP</td><td>交易所代碼：1 = NYSE、2 = AMEX、3 = NASDAQ</td></tr>
+              <tr><td><code>SHRCD</code></td><td>CRSP</td><td>股票類型代碼：10、11 = 普通股（排除 ETF、REITs、ADR 等）</td></tr>
+              <tr><td><code>PRC</code>、<code>SHROUT</code></td><td>CRSP</td><td>月底股價、流通在外股數</td></tr>
+              <tr><td><code>RET</code></td><td>CRSP</td><td>月報酬（含股利）</td></tr>
+              <tr><td><code>BM</code></td><td>Compustat 計算</td><td>帳面市值比</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>兩個排序變數的定義：</p>
+        <div class="formula">
+          ME<sub><var>i</var>,<var>t</var></sub> = |PRC<sub><var>i</var>,<var>t</var></sub>| × SHROUT<sub><var>i</var>,<var>t</var></sub>
+          <span class="formula__label">式 (3.1)　市值（market equity）</span>
+        </div>
+        <div class="formula">
+          BM<sub><var>i</var>,<var>t</var></sub> = <span class="frac"><span>Book equity<sub><var>i</var>,<var>t</var></sub></span><span>ME<sub><var>i</var>,<var>t</var></sub></span></span>
+          <span class="formula__label">式 (3.2)　帳面市值比（book-to-market ratio）</span>
+        </div>
+        <div class="callout callout--note">
+          <span class="callout__title">補充：為什麼股價要取絕對值？</span>
+          <p>CRSP 中，若某股票當天沒有收盤成交，會用買價與賣價的平均值代替收盤價，並<strong>加上負號</strong>作為標記。所以計算市值時要先取絕對值，否則會算出負的市值。</p>
+        </div>
+
+        <h2 id="s2-timing">2. 時間點：什麼時候排序、用哪個時點的資料？</h2>
+        <p>因子建構最容易出錯的地方不是公式，而是<strong>時間點</strong>。Fama-French 的慣例如下：</p>
+        <figure>
+          <div class="diagram">
+            <svg viewBox="0 0 640 210" role="img" aria-label="時間軸：t−1 年 12 月取得帳面權益與市值計算 BM，t 年 6 月底取市值並排序，t 年 7 月到 t+1 年 6 月持有投資組合">
+              <line class="svg-line" x1="30" y1="110" x2="610" y2="110"/>
+              <polygon class="svg-arrow" points="610,104 622,110 610,116"/>
+              <line class="svg-line" x1="120" y1="100" x2="120" y2="120"/>
+              <line class="svg-line--accent" x1="300" y1="96" x2="300" y2="124"/>
+              <line class="svg-line" x1="590" y1="100" x2="590" y2="120"/>
+              <text class="svg-text--strong" x="120" y="88" text-anchor="middle">12 月，t−1 年</text>
+              <text class="svg-text--strong" x="300" y="88" text-anchor="middle">6 月底，t 年</text>
+              <text class="svg-text--strong" x="590" y="88" text-anchor="middle">6 月，t+1 年</text>
+              <rect class="svg-box" x="40" y="138" width="170" height="56" rx="6"/>
+              <text class="svg-text" x="125" y="160" text-anchor="middle">BE（t−1 會計年度）</text>
+              <text class="svg-text" x="125" y="182" text-anchor="middle">÷ 12 月底 ME → BM</text>
+              <rect class="svg-box svg-box--accent" x="230" y="138" width="140" height="56" rx="6"/>
+              <text class="svg-text" x="300" y="160" text-anchor="middle">取 6 月底 ME</text>
+              <text class="svg-text" x="300" y="182" text-anchor="middle">排序、分組</text>
+              <rect class="svg-box svg-box--gold" x="300" y="20" width="290" height="40" rx="6"/>
+              <text class="svg-text" x="445" y="45" text-anchor="middle">持有期：t 年 7 月 ～ t+1 年 6 月</text>
+            </svg>
+          </div>
+          <figcaption>圖 3.1　FF3 的排序與持有時間軸</figcaption>
+        </figure>
+        <ol class="steps">
+          <li><strong>每年 6 月底排序一次</strong>：規模用 <var>t</var> 年 6 月底的 ME；價值用 <var>t</var>−1 會計年度的帳面權益，除以 <var>t</var>−1 年 12 月底的 ME。</li>
+          <li><strong>持有 12 個月</strong>：分組結果從 <var>t</var> 年 7 月沿用到 <var>t</var>+1 年 6 月，然後重新排序。</li>
+          <li><strong>市值加權用上個月底的 ME</strong>：第 <var>t</var> 月的權重只能用第 <var>t</var>−1 月底已知的市值。</li>
+        </ol>
+        <div class="callout callout--warning">
+          <span class="callout__title">常見錯誤：前視偏誤（look-ahead bias）</span>
+          <p>如果用 <var>t</var>−1 年 12 月的財報資料在 <var>t</var>−1 年 12 月就排序，等於假設投資人當下就看得到財報，但年報通常要幾個月後才公布。等到 6 月底，可以合理確定前一年的財報都已公開。同理，計算第 <var>t</var> 月報酬時，權重和分組都必須是「第 <var>t</var> 月開始前」就已知的資訊，程式中對應的就是 <code>shift(1)</code>。</p>
+        </div>
+
+        <h2 id="s3-breakpoints">3. 用 NYSE 股票決定分界點</h2>
+        <p>分界點只用 NYSE 股票計算，但<strong>所有</strong>普通股（NYSE、AMEX、NASDAQ）都會被分進組合：</p>
+        <ul>
+          <li><strong>規模</strong>：NYSE 股票 6 月底 ME 的<strong>中位數</strong>。ME ≤ 中位數為小型股（S），大於為大型股（B）。</li>
+          <li><strong>價值</strong>：NYSE 股票 BM 的<strong>第 30 與第 70 百分位數</strong>。低於第 30 百分位為成長股（G），30～70 為中性（N），高於第 70 百分位為價值股（V）。BM 為負或缺值的股票不納入。</li>
+        </ul>
+        <p>為什麼不用全部股票算分界點？NASDAQ 和 AMEX 有大量市值極小的<span class="term">微型股（microcaps）</span>。如果用全部股票的中位數，分界點會被拉得很低，「大型股」組合裡會混進許多其實很小的公司，「小型股」組合則幾乎全是微型股。用 NYSE 分界點，可以讓兩組在經濟意義上更有代表性，也避免因子報酬被流動性差的微型股主導。</p>
+
+        <h2 id="s4-six-portfolios">4. 2×3 排序與六個投資組合</h2>
+        <p>規模排序與價值排序<strong>各自獨立</strong>進行（非條件排序），兩者交集形成六個投資組合。每個組合內部都用市值加權計算月報酬：</p>
+        <div class="table-wrap">
+          <table>
+            <caption>表 3.2　ME × BM 的六個投資組合</caption>
+            <thead><tr><th></th><th>成長 G（BM &lt; P30）</th><th>中性 N（P30～P70）</th><th>價值 V（BM &gt; P70）</th></tr></thead>
+            <tbody>
+              <tr><th>小 S（ME ≤ P50）</th><td>SG</td><td>SN</td><td>SV</td></tr>
+              <tr><th>大 B（ME &gt; P50）</th><td>BG</td><td>BN</td><td>BV</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="formula">
+          <var>R</var><sub><var>p</var>,<var>t</var></sub> = <span class="frac"><span>∑<sub><var>i</var>∈<var>p</var></sub> ME<sub><var>i</var>,<var>t</var>−1</sub> <var>R</var><sub><var>i</var>,<var>t</var></sub></span><span>∑<sub><var>i</var>∈<var>p</var></sub> ME<sub><var>i</var>,<var>t</var>−1</sub></span></span>，　<var>p</var> ∈ {SG, SN, SV, BG, BN, BV}
+          <span class="formula__label">式 (3.3)　各組合的市值加權報酬</span>
+        </div>
+
+        <h2 id="s5-smb-hml">5. 由六個組合組出 SMB 與 HML</h2>
+        <div class="formula">
+          <var>R</var><sub>SMB</sub> =
+          <span class="frac"><span><var>R</var><sub>SG</sub> + <var>R</var><sub>SN</sub> + <var>R</var><sub>SV</sub></span><span>3</span></span>
+          −
+          <span class="frac"><span><var>R</var><sub>BG</sub> + <var>R</var><sub>BN</sub> + <var>R</var><sub>BV</sub></span><span>3</span></span>
+          <span class="formula__label">式 (3.4)　規模因子（small minus big）</span>
+        </div>
+        <div class="formula">
+          <var>R</var><sub>HML</sub> =
+          <span class="frac"><span><var>R</var><sub>SV</sub> + <var>R</var><sub>BV</sub></span><span>2</span></span>
+          −
+          <span class="frac"><span><var>R</var><sub>SG</sub> + <var>R</var><sub>BG</sub></span><span>2</span></span>
+          <span class="formula__label">式 (3.5)　價值因子（high minus low）</span>
+        </div>
+        <p>注意設計的巧思：SMB 在「成長、中性、價值」三種類型裡<strong>各自</strong>比較小型與大型，再取平均，所以 SMB 不太會受到價值效果的影響；HML 則在「小型、大型」裡各自比較價值與成長，所以 HML 不太會受到規模效果的影響。這就是為什麼要用雙變數排序，而不是各做一次單變數排序。</p>
+
+        <div class="callout callout--example">
+          <span class="callout__title">例題：手算某月的 SMB 與 HML</span>
+          <p>某月六個組合的市值加權報酬（%）：SG = 1.2、SN = 1.0、SV = 1.5、BG = 0.8、BN = 0.9、BV = 1.1。</p>
+          <ul>
+            <li>SMB = (1.2 + 1.0 + 1.5) ÷ 3 − (0.8 + 0.9 + 1.1) ÷ 3 = 1.233 − 0.933 = <strong>0.30%</strong></li>
+            <li>HML = (1.5 + 1.1) ÷ 2 − (1.2 + 0.8) ÷ 2 = 1.30 − 1.00 = <strong>0.30%</strong></li>
+          </ul>
+          <p>這個月小型股與價值股都表現較好，兩個因子皆為正。</p>
+        </div>
+
+        <h2 id="s6-python">6. 用 pandas 實作</h2>
+        <p>以下程式採用「長格式」（每一列是一個股票-月份），全部用 <code>groupby</code> 完成，邏輯和第 2～5 節一一對應。假設已準備好兩個檔案：CRSP 月資料 <code>crsp_monthly.csv</code>，以及已算好 BM 的 <code>compustat_bm.csv</code>（每一列為 <code>date</code>、<code>PERMNO</code>、<code>BM</code>）。</p>
+
+        <h3>步驟 1～2：讀取資料、計算市值、合併 BM</h3>
+<pre><code>import numpy as np
+import pandas as pd
+
+crsp = pd.read_csv("crsp_monthly.csv", parse_dates=["date"])
+crsp["date"] = crsp["date"] + pd.offsets.MonthEnd(0)      # 統一成月底日期
+crsp = crsp[crsp["SHRCD"].isin([10, 11])]                  # 只保留普通股
+crsp["RET"] = pd.to_numeric(crsp["RET"], errors="coerce")  # 處理 'C'、'B' 等非數值代碼
+crsp["ME"] = crsp["PRC"].abs() * crsp["SHROUT"]            # 式 (3.1)
+
+bm = pd.read_csv("compustat_bm.csv", parse_dates=["date"])
+bm["date"] = bm["date"] + pd.offsets.MonthEnd(0)
+df = crsp.merge(bm[["date", "PERMNO", "BM"]], on=["date", "PERMNO"], how="left")
+
+# 權重要用「上個月底」的市值：先在完整資料上做 shift，避免前視偏誤
+df = df.sort_values(["PERMNO", "date"])
+df["ME_lag"] = df.groupby("PERMNO")["ME"].shift(1)</code></pre>
+
+        <h3>步驟 3：每年 6 月底，用 NYSE 股票計算分界點</h3>
+<pre><code>june = df[(df["date"].dt.month == 6) &amp; df["ME"].notna()].copy()
+nyse = june[june["EXCHCD"] == 1]
+
+me50 = nyse.groupby("date")["ME"].median().rename("me50")
+bm_bp = (nyse[nyse["BM"] &gt; 0]
+         .groupby("date")["BM"].quantile([0.3, 0.7])
+         .unstack()
+         .rename(columns={0.3: "bm30", 0.7: "bm70"}))
+
+june = june.join(me50, on="date").join(bm_bp, on="date")</code></pre>
+
+        <h3>步驟 4：貼上規模與價值標籤，形成 2×3 組合</h3>
+<pre><code>june["size"] = np.where(june["ME"] &lt;= june["me50"], "S", "B")
+june["value"] = np.select(
+    [june["BM"] &lt; june["bm30"], june["BM"] &lt;= june["bm70"]],
+    ["G", "N"],
+    default="V",
+)
+june = june[june["BM"] &gt; 0]                    # BM 為負或缺值：不納入
+june["port"] = june["size"] + june["value"]    # 例如 "SG"、"BV"
+june["form_year"] = june["date"].dt.year</code></pre>
+
+        <h3>步驟 5：分組沿用到 7 月～隔年 6 月，計算市值加權報酬</h3>
+<pre><code># 7 月到 12 月屬於當年 6 月的分組；1 月到 6 月屬於前一年 6 月的分組
+df["form_year"] = np.where(df["date"].dt.month &gt;= 7,
+                           df["date"].dt.year, df["date"].dt.year - 1)
+held = df.merge(june[["PERMNO", "form_year", "port"]],
+                on=["PERMNO", "form_year"], how="inner")
+held = held.dropna(subset=["RET", "ME_lag"])
+
+held["w_ret"] = held["RET"] * held["ME_lag"]
+g = held.groupby(["date", "port"])[["w_ret", "ME_lag"]].sum()
+ports = (g["w_ret"] / g["ME_lag"]).unstack("port") * 100   # 式 (3.3)，單位 %</code></pre>
+
+        <h3>步驟 6：組出 SMB 與 HML</h3>
+<pre><code>smb = ports[["SG", "SN", "SV"]].mean(axis=1) - ports[["BG", "BN", "BV"]].mean(axis=1)  # 式 (3.4)
+hml = ports[["SV", "BV"]].mean(axis=1) - ports[["SG", "BG"]].mean(axis=1)              # 式 (3.5)
+factors = pd.DataFrame({"SMB_rep": smb, "HML_rep": hml})</code></pre>
+
+        <div class="callout callout--note">
+          <span class="callout__title">補充：課堂版本的寫法</span>
+          <p>課堂範例把資料轉成「寬格式」（列 = 月份、欄 = PERMNO），用 <code>ffill(limit=11)</code> 把 6 月的分組往後延伸 11 個月，再 <code>shift(1)</code> 對齊下一期報酬。兩種寫法結果相同：寬格式比較直觀，長格式在股票數很多時比較省記憶體，也比較容易加入新的排序變數。</p>
+        </div>
+
+        <h2 id="s7-validation">7. 驗證：和官方因子比一比</h2>
+        <p>Kenneth French 的資料庫公布了官方的 FF3 因子與六個 2×3 投資組合報酬，可以用 <code>pandas_datareader</code> 直接下載比對：</p>
+<pre><code>import pandas_datareader.data as web
+
+ff = web.DataReader("F-F_Research_Data_Factors", "famafrench",
+                    start=factors.index.min(), end=factors.index.max())[0]
+ff.index = ff.index.to_timestamp("M")          # 轉成月底日期，與 factors 對齊
+compare = ff[["SMB", "HML"]].join(factors, how="inner")
+print(compare.corr().round(3))</code></pre>
+        <p>檢查重點：</p>
+        <ul>
+          <li><strong>相關係數</strong>：課堂範例使用 2016～2020 年資料，複製的 SMB、HML 與官方因子的相關係數都在 0.98 左右，代表方法正確。</li>
+          <li><strong>逐組比較</strong>：若某個因子對不上，可以下載官方的 <code>6_Portfolios_2x3</code>，逐一比較 SV、BG 等組合，找出是哪一組出問題。</li>
+          <li><strong>剩下的小差異</strong>從哪來？官方 BM 的時間點定義更嚴格（帳面權益來自 <var>t</var>−1 會計年度、除以 <var>t</var>−1 年 12 月底市值），且帳面權益會加上遞延稅、扣掉特別股，同一家公司的多種股票市值也會合併計算。</li>
+        </ul>
+
+        <h2 id="s8-using-ff3">8. 做出來之後：FF3 迴歸怎麼用？</h2>
+        <p>有了三個因子，就可以對任何股票或基金做時間序列迴歸，看它的報酬來自哪裡：</p>
+        <div class="formula">
+          <var>R</var><sub><var>i</var>,<var>t</var></sub> − <var>R</var><sub><var>f</var>,<var>t</var></sub> = <var>α</var><sub><var>i</var></sub> + <var>β</var><sub><var>i</var></sub>(Mkt-RF)<sub><var>t</var></sub> + <var>s</var><sub><var>i</var></sub>SMB<sub><var>t</var></sub> + <var>h</var><sub><var>i</var></sub>HML<sub><var>t</var></sub> + <var>ε</var><sub><var>i</var>,<var>t</var></sub>
+          <span class="formula__label">式 (3.6)　FF3 時間序列迴歸</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <caption>表 3.3　如何解讀迴歸係數</caption>
+            <thead><tr><th>係數</th><th>大於 0</th><th>小於 0</th></tr></thead>
+            <tbody>
+              <tr><td><var>s</var><sub><var>i</var></sub>（SMB 負荷）</td><td>偏向小型股</td><td>偏向大型股</td></tr>
+              <tr><td><var>h</var><sub><var>i</var></sub>（HML 負荷）</td><td>偏向價值股</td><td>偏向成長股</td></tr>
+              <tr><td><var>α</var><sub><var>i</var></sub></td><td colspan="2">三個因子都解釋不了的平均超額報酬；顯著為正才代表真正的「超額」表現</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout callout--note">
+          <span class="callout__title">延伸：如果要做台灣版的 FF3？</span>
+          <p>流程完全相同，只要替換資料與分界點：股價、市值與財報資料可以使用 TEJ 台灣經濟新報；分界點可以改用上市（TWSE）股票計算，角色類似美國的 NYSE；無風險利率可用一年期定存利率或短期票券利率換算的月利率。台灣上市公司的年度財報須在會計年度結束後三個月內公告，因此「6 月底排序」的時間點同樣能避免前視偏誤。</p>
+        </div>
+      </section>
+
+      <section id="summary" class="lesson-section">
+        <h2>重點整理</h2>
+        <ul class="key-points">
+          <li>ME = |PRC| × SHROUT；股價取絕對值，是因為 CRSP 用負號標記以買賣價平均代替收盤價的情況。</li>
+          <li>只用普通股（SHRCD 10、11），但分界點只用 NYSE 股票（EXCHCD = 1）計算，以免被微型股主導。</li>
+          <li>每年 6 月底排序，持有到隔年 6 月；BM 使用前一年的財報資訊，權重使用上個月底的市值，避免前視偏誤。</li>
+          <li>規模以 NYSE 中位數分兩組，BM 以 NYSE 第 30、70 百分位分三組，交集成六個市值加權組合。</li>
+          <li>SMB ＝ 三個小型組合平均 − 三個大型組合平均；HML ＝ 兩個價值組合平均 − 兩個成長組合平均。</li>
+          <li>複製結果應與 Kenneth French 官方因子高度相關（約 0.98）；對不上時，逐組比較六個投資組合找出問題。</li>
+        </ul>
+      </section>
+
+      <section id="exercises" class="lesson-section">
+        <h2>小練習</h2>
+
+        <div class="exercise">
+          <p class="exercise__q"><strong>Q1.</strong>某月六個組合的報酬（%）為：SG = −2.0、SN = 0.5、SV = 1.0、BG = 3.0、BN = 1.0、BV = −0.5。請計算 SMB 與 HML，並用一句話描述這個月的市場風格。</p>
+          <details>
+            <summary>查看解答</summary>
+            <p>SMB = (−2.0 + 0.5 + 1.0) ÷ 3 − (3.0 + 1.0 − 0.5) ÷ 3 = (−0.167) − 1.167 = <strong>−1.33%</strong>。</p>
+            <p>HML = (1.0 − 0.5) ÷ 2 − (−2.0 + 3.0) ÷ 2 = 0.25 − 0.50 = <strong>−0.25%</strong>。</p>
+            <p>這個月大型股明顯勝過小型股，成長股也略勝價值股，主要是大型成長股（BG = 3.0%）帶動。</p>
+          </details>
+        </div>
+
+        <div class="exercise">
+          <p class="exercise__q"><strong>Q2.</strong>同學在計算組合報酬時，用的是「當月底」的市值 ME<sub><var>t</var></sub> 作為權重，而不是 ME<sub><var>t</var>−1</sub>。這會造成什麼問題？</p>
+          <details>
+            <summary>查看解答</summary>
+            <p>這是<strong>前視偏誤</strong>。當月底的市值已經包含當月的漲跌：當月大漲的股票，ME<sub><var>t</var></sub> 會變大，權重也跟著變大。等於事後才加碼贏家，組合報酬會被系統性高估。正確做法是用月初（上個月底）就已知的 ME<sub><var>t</var>−1</sub>，對應程式中的 <code>groupby("PERMNO")["ME"].shift(1)</code>。</p>
+          </details>
+        </div>
+
+        <div class="exercise">
+          <p class="exercise__q"><strong>Q3.</strong>某檔基金對 FF3 跑迴歸，得到 <var>α</var> = 0.05%（t = 0.4）、<var>β</var> = 1.02、<var>s</var> = 0.65、<var>h</var> = −0.30。這檔基金的投資風格為何？經理人有沒有選股能力？</p>
+          <details>
+            <summary>查看解答</summary>
+            <p>市場 β 約為 1，<var>s</var> = 0.65 &gt; 0 表示偏向小型股，<var>h</var> = −0.30 &lt; 0 表示偏向成長股：這是一檔<strong>小型成長型</strong>基金。</p>
+            <p><var>α</var> 的 t 值只有 0.4，遠小於 1.96，統計上不顯著。基金的報酬可以被市場、規模與價值三個因子解釋，<strong>沒有證據</strong>顯示經理人有額外的選股能力。</p>
+          </details>
+        </div>
+      </section>
+
+      <section id="resources" class="lesson-section">
+        <h2>延伸資源</h2>
+        <ul class="refs">
+          <li>Fama, E. F., &amp; French, K. R. (1993). Common risk factors in the returns on stocks and bonds. <cite>Journal of Financial Economics</cite>, 33(1): 3–56.</li>
+          <li><a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/f-f_factors.html">Kenneth R. French：Description of Fama/French Factors（官方建構方法說明）</a></li>
+          <li><a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Kenneth R. French：Data Library（F-F_Research_Data_Factors、6_Portfolios_2x3）</a></li>
+          <li><a href="https://pandas-datareader.readthedocs.io/en/latest/remote_data.html#fama-french-data-ken-french-s-data-library">pandas-datareader 文件：Fama/French Data</a></li>
+        </ul>
+      </section>
+
+      <nav id="lesson-nav" aria-label="上一講與下一講"></nav>
+    </article>
+
+    <aside class="toc-wrap" aria-label="本講目錄">
+      <nav id="toc"></nav>
+    </aside>
+  </main>
+
+  <footer id="site-footer"></footer>
+</body>
+</html>

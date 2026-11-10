@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-Hant" data-root="../../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Factor Investing II｜投資組合管理｜商學院講義庫</title>
+  <meta name="description" content="技術面因子：動能、波動、偏態與流動性">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+  <link rel="stylesheet" href="../../assets/css/style.css">
+  <script src="../../assets/js/catalog.js" defer></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="page-lesson" data-course="portfolio-management" data-lesson="ipm-02">
+  <header id="site-header"></header>
+
+  <main class="lesson-layout">
+    <article class="lesson">
+      <nav id="breadcrumb" class="breadcrumb" aria-label="麵包屑"></nav>
+
+      <header class="lesson-header">
+        <p class="lesson-kicker">IPM · Lecture 02 · Week 10</p>
+        <h1>Factor Investing II</h1>
+        <p class="lesson-subtitle">技術面因子：動能、波動、偏態與流動性</p>
+        <dl class="lesson-meta">
+          <div><dt>先備知識</dt><dd>第 01 講、FF3 模型、迴歸殘差</dd></div>
+          <div><dt>閱讀時間</dt><dd>約 30 分鐘</dd></div>
+          <div><dt>最後更新</dt><dd>2026-11-10</dd></div>
+        </dl>
+        <p class="source-note">內容來源：Investment &amp; Portfolio Management（Douglas Chung）Lecture 10「Factor investing II – technical factors」。本頁為學習筆記，以自己的文字重新整理。</p>
+      </header>
+
+      <section id="objectives" class="lesson-section">
+        <h2>學習目標</h2>
+        <ol>
+          <li>能夠說明效率市場假說的三種形式，以及它們之間的包含關係。</li>
+          <li>能夠計算個股的動能訊號，並說明橫斷面動能（WML）與時間序列動能的差異。</li>
+          <li>能夠由 FF3 迴歸殘差計算特質波動（IVol）與特質偏態（ISkew）。</li>
+          <li>能夠說明共偏態、MAX 與 Amihud 非流動性指標的定義，以及它們與未來報酬的關係方向。</li>
+        </ol>
+      </section>
+
+      <section id="content" class="lesson-section">
+        <h2 id="s1-emh">1. 效率市場假說：技術面因子為什麼「不該」有效？</h2>
+        <p>上一講的因子主要使用會計資訊；這一講的因子只使用<strong>價格與成交量</strong>。在討論它們之前，要先回答一個問題：如果市場是有效率的，光看過去的股價，真的能預測未來報酬嗎？</p>
+        <div class="callout callout--definition">
+          <span class="callout__title">定義：效率市場假說（Efficient Market Hypothesis, EMH）</span>
+          <p>(1) 股價反映所有可得的資訊；(2) 市場參與者會對最新的資訊與預測迅速做出反應；(3) 因此股價呈現隨機漫步，平均而言，主動交易無法打敗市場。</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <caption>表 2.1　效率市場的三種形式</caption>
+            <thead><tr><th>形式</th><th>股價已反映的資訊</th><th>因此無法獲得超額報酬的方法</th></tr></thead>
+            <tbody>
+              <tr><td>弱式（weak form）</td><td>過去的交易資料：歷史價格、成交量</td><td>技術分析</td></tr>
+              <tr><td>半強式（semi-strong form）</td><td>所有公開資訊：交易資料＋財務報表等</td><td>基本面分析</td></tr>
+              <tr><td>強式（strong form）</td><td>所有資訊：公開與未公開（內線）資訊</td><td>內線交易</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure>
+          <div class="diagram">
+            <svg viewBox="0 0 640 230" role="img" aria-label="三個同心區域：最外圈是弱式，中間是半強式，最內圈是強式">
+              <ellipse class="svg-box" cx="320" cy="115" rx="290" ry="100"/>
+              <ellipse class="svg-box svg-box--accent" cx="320" cy="128" rx="190" ry="72"/>
+              <ellipse class="svg-box svg-box--gold" cx="320" cy="142" rx="95" ry="42"/>
+              <text class="svg-text--strong" x="320" y="38" text-anchor="middle">弱式效率</text>
+              <text class="svg-text--strong" x="320" y="88" text-anchor="middle">半強式效率</text>
+              <text class="svg-text--strong" x="320" y="148" text-anchor="middle">強式效率</text>
+            </svg>
+          </div>
+          <figcaption>圖 2.1　強式 ⟹ 半強式 ⟹ 弱式：越內圈的假設越強</figcaption>
+        </figure>
+        <p>三者的邏輯關係是：<strong>強式成立 ⟹ 半強式成立 ⟹ 弱式成立</strong>。反過來說，只要找到「光用過去價格就能賺到超額報酬」的證據，就代表<strong>弱式不成立</strong>，半強式和強式也都跟著不成立。這正是技術面因子在學術上引人注目的原因。</p>
+
+        <h2 id="s2-momentum">2. 動能（Momentum, MOM）</h2>
+        <p><span class="term">動能（momentum）</span>是最有名的技術面因子：過去一年漲得多的股票（贏家），未來幾個月傾向繼續表現較好；跌得多的（輸家）傾向繼續落後（Jegadeesh &amp; Titman, 1993）。</p>
+
+        <h3>動能訊號</h3>
+        <p>在第 <var>t</var> 月，股票 <var>i</var> 的動能訊號是它<strong>從第 <var>t</var>−12 月到第 <var>t</var>−2 月</strong>的累積報酬：</p>
+        <div class="formula">
+          MOM<sub><var>i</var>,<var>t</var></sub> = ∏<sub><var>τ</var>=2</sub><sup>12</sup> (1 + <var>r</var><sub><var>i</var>,<var>t</var>−<var>τ</var></sub>)
+          <span class="formula__label">式 (2.1)　動能訊號：過去 12 個月、跳過最近 1 個月</span>
+        </div>
+        <ul class="where">
+          <li><var>r</var><sub><var>i</var>,<var>t</var>−<var>τ</var></sub>：股票 <var>i</var> 在第 <var>t</var>−<var>τ</var> 月的報酬</li>
+          <li>這個連乘積是「總報酬倍數」；減 1 就是累積報酬率。排序時兩者結果相同。</li>
+        </ul>
+        <div class="callout callout--note">
+          <span class="callout__title">補充：為什麼要跳過最近一個月？</span>
+          <p>個股在一個月的短期內，報酬有<strong>反轉</strong>的傾向（上個月漲多、這個月容易回檔），部分原因來自買賣價差等市場微結構雜訊。若把第 <var>t</var>−1 月放進來，短期反轉會抵消中期動能，所以慣例上把它排除。</p>
+        </div>
+
+        <h3>橫斷面動能因子：WML</h3>
+        <p>建構方法與第 01 講的 HML 完全相同，只是把 BM 換成 MOM：用 ME 與 MOM 做 2×3 非條件雙變數排序。ME 的分界點是 NYSE 中位數，MOM 的分界點是 NYSE 的第 30、70 百分位數。</p>
+        <div class="table-wrap">
+          <table>
+            <caption>表 2.2　動能因子的六個投資組合</caption>
+            <thead><tr><th></th><th>輸家 Loser</th><th>中性 Neutral</th><th>贏家 Winner</th></tr></thead>
+            <tbody>
+              <tr><th>小 Small</th><td>SL</td><td>SN</td><td>SW</td></tr>
+              <tr><th>大 Big</th><td>BL</td><td>BN</td><td>BW</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="formula">
+          <var>R</var><sub>WML</sub> =
+          <span class="frac"><span><var>R</var><sub>SW</sub> + <var>R</var><sub>BW</sub></span><span>2</span></span>
+          −
+          <span class="frac"><span><var>R</var><sub>SL</sub> + <var>R</var><sub>BL</sub></span><span>2</span></span>
+          <span class="formula__label">式 (2.2)　贏家減輸家（winners minus losers）</span>
+        </div>
+        <p>也就是：買進小型與大型贏家組合的等權平均、放空小型與大型輸家組合的等權平均。</p>
+
+        <h3>時間序列動能</h3>
+        <p>橫斷面動能比的是「相對」表現：誰比別人漲得多。<span class="term">時間序列動能（time-series momentum）</span>只看「絕對」表現：買進所有過去動能為正的股票、放空所有動能為負的股票（各自等權重）。</p>
+        <div class="formula">
+          <var>R</var><sub>TSWML</sub> = <var>R</var><sub>MOM+</sub> − <var>R</var><sub>MOM−</sub>
+          <span class="formula__label">式 (2.3)　時間序列動能策略</span>
+        </div>
+        <p>它的好處是不需要在每個時間點對所有股票排名。代價是：在全面上漲的年份，多頭會遠多於空頭，策略的市場暴露會隨時間改變。</p>
+        <p>動能並不是近年才出現的現象。Geczy 與 Samonov（2016）把資料往前延伸到兩百多年，發現價格動能在極長的歷史中都存在；Kenneth French 資料庫中的 FF3 與動能因子歷史報酬也顯示，動能是長期報酬最高、但偶爾會出現劇烈崩跌的因子之一。</p>
+
+        <h2 id="s3-ivol">3. 特質波動（Idiosyncratic Volatility, IVol）</h2>
+        <p>Ang、Hodrick、Xing 與 Zhang（2006）發現：相對於 FF3 模型，<strong>特質波動高的股票，平均報酬反而非常低</strong>，而且規模、BM、動能、流動性都無法解釋這個現象。這與「風險越高、報酬越高」的直覺相反，因此被稱為 IVol 謎團（IVol puzzle）。</p>
+        <p>計算方式：每個月用個股的<strong>日報酬</strong>跑一次 FF3 迴歸，取殘差的均方根：</p>
+        <div class="formula">
+          IVol<sub><var>i</var>,<var>m</var></sub> = √(
+          <span class="frac"><span>1</span><span><var>N</var>(<var>m</var>)</span></span>
+          ∑<sub><var>t</var>∈<var>m</var></sub> <var>ε̂</var><sub><var>i</var>,<var>t</var></sub><sup>2</sup> )
+          <span class="formula__label">式 (2.4)　特質波動</span>
+        </div>
+        <ul class="where">
+          <li><var>ε̂</var><sub><var>i</var>,<var>t</var></sub>：股票 <var>i</var> 第 <var>t</var> 日的 FF3 迴歸殘差</li>
+          <li><var>N</var>(<var>m</var>)：第 <var>m</var> 月的交易日數（必要時做自由度調整）</li>
+        </ul>
+        <p>換句話說，月 IVol 就是「這個月用日資料跑 FF3 迴歸的<strong>均方根誤差（RMSE）</strong>」：股價波動中，三個因子解釋不了的那一部分有多大。</p>
+
+        <h2 id="s4-coskewness">4. 共偏態（Coskewness）</h2>
+        <p>投資人通常喜歡右偏（偶爾大漲）、討厭左偏（偶爾大跌）的報酬。Harvey 與 Siddique（2000）認為，真正重要的是<strong>系統性偏態</strong>：當市場出現極端波動時，這檔股票的表現如何？如果一檔股票在市場劇烈波動時傾向下跌（共偏態為負），投資人會要求較高的報酬作為補償。他們估計這個風險溢酬平均每年約 3.6%，並發現動能效應與系統性偏態有關。</p>
+        <div class="formula">
+          Coskew<sub><var>i</var>,<var>t</var></sub> =
+          <span class="frac"><span>E[ <var>ê</var><sub><var>i</var>,<var>t</var></sub> <var>ê</var><sub><var>m</var>,<var>t</var></sub><sup>2</sup> ]</span><span>√( E[ <var>ê</var><sub><var>i</var>,<var>t</var></sub><sup>2</sup> ] · E[ <var>ê</var><sub><var>m</var>,<var>t</var></sub><sup>2</sup> ] )</span></span>
+          <span class="formula__label">式 (2.5)　共偏態</span>
+        </div>
+        <ul class="where">
+          <li><var>ê</var><sub><var>i</var>,<var>t</var></sub> = <var>r</var><sub><var>i</var>,<var>t</var></sub> − <var>â</var><sub><var>i</var></sub> − <var>b̂</var><sub><var>i</var></sub><var>r</var><sub><var>m</var>,<var>t</var></sub>：單一指數模型（以過去 60 個月滾動估計）的殘差</li>
+          <li><var>ê</var><sub><var>m</var>,<var>t</var></sub> = <var>r</var><sub><var>m</var>,<var>t</var></sub> − E[<var>r</var><sub><var>m</var>,<var>t</var></sub>]：市場報酬偏離平均的部分</li>
+        </ul>
+        <p>直覺上，它衡量的是「個股殘差」與「市場波動大小（平方）」之間的相關程度：數值越負，代表市場一劇烈波動，這檔股票就越容易表現不佳。</p>
+
+        <h2 id="s5-iskew">5. 特質偏態（Idiosyncratic Skewness, ISkew）</h2>
+        <p>相對於系統性偏態，個股自己的偏態也會影響價格。理論預測：特質偏態高的股票像樂透，投資人願意為它付出較高的價格，因此<strong>未來報酬較低</strong>。Boyer、Mitton 與 Vorkink（2010）的實證支持這個預測：預期特質偏態最低的五分之一股票，FF3 alpha 每月比最高的五分之一多出約 1%。</p>
+        <div class="formula">
+          ISkew<sub><var>i</var>,<var>m</var></sub> =
+          <span class="frac"><span>1</span><span><var>N</var>(<var>m</var>)</span></span>
+          <span class="frac"><span>∑<sub><var>t</var>∈<var>m</var></sub> <var>ε̂</var><sub><var>i</var>,<var>t</var></sub><sup>3</sup></span><span>(IVol<sub><var>i</var>,<var>m</var></sub>)<sup>3</sup></span></span>
+          <span class="formula__label">式 (2.6)　特質偏態</span>
+        </div>
+        <p>它和 IVol 用的是同一組 FF3 日殘差：IVol 是殘差的二階動差（開根號），ISkew 是標準化後的三階動差。</p>
+
+        <h2 id="s6-max">6. 最大日報酬（MAX）</h2>
+        <p>Bali、Cakici 與 Whitelaw（2011）從「股票像樂透」的角度出發：許多投資人分散不足，又偏好可能一夕暴漲的股票。他們發現，<strong>過去一個月最大日報酬（MAX）越高的股票，未來報酬越低</strong>。</p>
+        <div class="formula">
+          MAX<sub><var>i</var>,<var>m</var></sub> = max<sub><var>t</var>∈<var>m</var></sub> ( <var>r</var><sub><var>i</var>,<var>t</var></sub> )
+          <span class="formula__label">式 (2.7)　當月最大日報酬</span>
+        </div>
+        <p>MAX 與 IVol 在統計上高度相關（波動大的股票，最大單日漲幅通常也大）。更有趣的是，把 MAX 放進迴歸後，IVol 與報酬之間令人困惑的負向關係反而翻轉了。這暗示 IVol 謎團背後，可能其實是投資人對「樂透型」股票的偏好。</p>
+
+        <h2 id="s7-illiquidity">7. 非流動性（Amihud ILLIQ）</h2>
+        <p>流動性差的股票不容易買賣，投資人會要求<strong>非流動性溢酬</strong>作為補償。Amihud（2002）提出一個只需日資料就能計算的簡單指標：</p>
+        <div class="formula">
+          ILLIQ<sub><var>i</var>,<var>t</var></sub> =
+          <span class="frac"><span>1</span><span>252</span></span>
+          ∑<sub><var>s</var>=<var>t</var>−251</sub><sup><var>t</var></sup>
+          <span class="frac"><span>|<var>r</var><sub><var>i</var>,<var>s</var></sub>|</span><span>DVol<sub><var>i</var>,<var>s</var></sub></span></span>
+          <span class="formula__label">式 (2.8)　Amihud 非流動性指標（過去一年平均）</span>
+        </div>
+        <ul class="where">
+          <li>|<var>r</var><sub><var>i</var>,<var>s</var></sub>|：第 <var>s</var> 日報酬的絕對值</li>
+          <li>DVol<sub><var>i</var>,<var>s</var></sub>：第 <var>s</var> 日的成交金額（股價 × 成交量）</li>
+        </ul>
+        <p>直覺：<strong>每成交一塊錢，股價會被推動多少？</strong>如果一點點成交金額就能讓股價大幅變動，這檔股票就不具流動性，ILLIQ 會很大。</p>
+        <div class="callout callout--example">
+          <span class="callout__title">例題：比較兩檔股票的流動性（以 3 個交易日示意）</span>
+          <p>股票 A：日報酬絕對值 1%、2%、0.5%；成交金額 50、20、100（百萬元）。</p>
+          <p>每日比率 = 1/50 = 0.020、2/20 = 0.100、0.5/100 = 0.005；平均 ILLIQ<sub>A</sub> = 0.125 ÷ 3 ≈ <strong>0.042</strong>（% / 百萬元）。</p>
+          <p>股票 B：日報酬絕對值 1%、1%、2%；成交金額 1,000、800、2,000（百萬元），平均 ILLIQ<sub>B</sub> = (0.001 + 0.00125 + 0.001) ÷ 3 ≈ <strong>0.0011</strong>。</p>
+          <p>B 每百萬元成交只推動股價約 0.001%，比 A 流動得多。依 Amihud 的發現，A 應該伴隨較高的預期報酬。</p>
+        </div>
+
+        <h2 id="s8-overview">8. 技術面因子總覽</h2>
+        <div class="table-wrap">
+          <table>
+            <caption>表 2.3　本講介紹的技術面因子</caption>
+            <thead><tr><th>因子</th><th>使用資料</th><th>訊號越高，未來報酬</th><th>主要解釋</th></tr></thead>
+            <tbody>
+              <tr><td>動能 MOM</td><td>月報酬（t−12 到 t−2）</td><td>較高</td><td>投資人對資訊反應不足、系統性偏態</td></tr>
+              <tr><td>特質波動 IVol</td><td>日報酬、FF3 殘差</td><td>較低</td><td>謎團；可能與樂透偏好（MAX）有關</td></tr>
+              <tr><td>共偏態 Coskew</td><td>月報酬、60 個月滾動</td><td>較低（越負越高）</td><td>負共偏態是系統性風險，要求補償</td></tr>
+              <tr><td>特質偏態 ISkew</td><td>日報酬、FF3 殘差</td><td>較低</td><td>樂透型股票被高估</td></tr>
+              <tr><td>最大日報酬 MAX</td><td>當月日報酬</td><td>較低</td><td>樂透偏好、分散不足</td></tr>
+              <tr><td>非流動性 ILLIQ</td><td>日報酬、成交金額</td><td>較高</td><td>非流動性溢酬</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout callout--warning">
+          <span class="callout__title">常見錯誤：把 IVol 當成「風險越高報酬越高」</span>
+          <p>CAPM 告訴我們，只有系統性風險會被定價，特質風險可以被分散掉，理論上不該影響報酬。實證上 IVol 不但被「定價」，而且方向是<strong>負的</strong>，這正是它被稱為謎團的原因。</p>
+        </div>
+      </section>
+
+      <section id="summary" class="lesson-section">
+        <h2>重點整理</h2>
+        <ul class="key-points">
+          <li>EMH 有弱式、半強式、強式三種形式，強式 ⟹ 半強式 ⟹ 弱式；技術面因子有效，就違反了弱式效率。</li>
+          <li>動能訊號是第 t−12 到 t−2 月的累積報酬，跳過最近一個月以避開短期反轉。</li>
+          <li>WML 由 ME × MOM 的 2×3 排序建構：(SW + BW)/2 − (SL + BL)/2；時間序列動能則買正動能、空負動能。</li>
+          <li>IVol 是當月日資料 FF3 迴歸的 RMSE；高 IVol 股票未來報酬反而較低（IVol 謎團）。</li>
+          <li>負共偏態代表市場劇烈波動時表現差，是被定價的系統性風險；特質偏態與 MAX 高的「樂透股」未來報酬較低。</li>
+          <li>Amihud ILLIQ 是 |報酬| / 成交金額的一年平均，衡量「每單位成交金額推動股價的幅度」，非流動性越高，預期報酬越高。</li>
+        </ul>
+      </section>
+
+      <section id="exercises" class="lesson-section">
+        <h2>小練習</h2>
+
+        <div class="exercise">
+          <p class="exercise__q"><strong>Q1.</strong>現在是第 <var>t</var> 月。某股票第 <var>t</var>−12 到第 <var>t</var>−2 月，每個月報酬都是 +2%；第 <var>t</var>−1 月下跌 15%。請計算它的 MOM 訊號（以累積報酬率表示）。如果把第 <var>t</var>−1 月也算進去，結果會差多少？</p>
+          <details>
+            <summary>查看解答</summary>
+            <p>第 <var>t</var>−12 到 <var>t</var>−2 月共 11 個月：MOM = 1.02<sup>11</sup> − 1 ≈ 1.2434 − 1 = <strong>24.3%</strong>。</p>
+            <p>若加入第 <var>t</var>−1 月：1.2434 × 0.85 − 1 ≈ 5.7%。差了將近 19 個百分點，可能讓這檔股票從「贏家」掉到「中性」。由於短期有反轉傾向，上個月的大跌不一定代表動能轉弱，這正是公式要跳過最近一個月的原因。</p>
+          </details>
+        </div>
+
+        <div class="exercise">
+          <p class="exercise__q"><strong>Q2.</strong>某股票某月只有 5 個交易日（為了方便計算），FF3 迴歸的日殘差依序為 1%、−2%、0.5%、1.5%、−1%。請計算該月的 IVol 與 ISkew（不做自由度調整）。</p>
+          <details>
+            <summary>查看解答</summary>
+            <p>殘差平方：1、4、0.25、2.25、1，總和 8.5；IVol = √(8.5 ÷ 5) = √1.7 ≈ <strong>1.304%</strong>。</p>
+            <p>殘差立方：1、−8、0.125、3.375、−1，總和 −4.5；平均 = −0.9。IVol<sup>3</sup> ≈ 1.304<sup>3</sup> ≈ 2.217。</p>
+            <p>ISkew = −0.9 ÷ 2.217 ≈ <strong>−0.41</strong>：這個月的殘差略為左偏，主要來自 −2% 那一天。</p>
+          </details>
+        </div>
+
+        <div class="exercise">
+          <p class="exercise__q"><strong>Q3.</strong>如果研究發現「只用過去 12 個月的股價就能建立有顯著超額報酬的投資組合」，這個發現與哪一種形式的效率市場假說矛盾？它對其他兩種形式又有什麼含意？</p>
+          <details>
+            <summary>查看解答</summary>
+            <p>它與<strong>弱式</strong>效率矛盾，因為弱式主張歷史價格資訊已完全反映在股價中。</p>
+            <p>由於強式 ⟹ 半強式 ⟹ 弱式，弱式不成立時，半強式與強式也都不成立（不是弱式 ⟹ 不是半強式 ⟹ 不是強式）。但要注意，「超額報酬」也可能只是模型沒有納入的風險補償，例如動能與系統性偏態的關係，所以這類證據常被稱為「聯合假說問題」。</p>
+          </details>
+        </div>
+      </section>
+
+      <section id="resources" class="lesson-section">
+        <h2>延伸資源</h2>
+        <ul class="refs">
+          <li>Fama, E. F. (1970). Efficient capital markets: A review of theory and empirical work. <cite>The Journal of Finance</cite>, 25(2): 383–417.</li>
+          <li>Jegadeesh, N., &amp; Titman, S. (1993). Returns to buying winners and selling losers: Implications for stock market efficiency. <cite>The Journal of Finance</cite>, 48(1): 65–91.</li>
+          <li>Geczy, C., &amp; Samonov, M. (2016). Two centuries of price-return momentum. <cite>Financial Analysts Journal</cite>, 72(5): 32–56.</li>
+          <li>Ang, A., Hodrick, R. J., Xing, Y., &amp; Zhang, X. (2006). The cross-section of volatility and expected returns. <cite>The Journal of Finance</cite>, 61(1): 259–299.</li>
+          <li>Harvey, C. R., &amp; Siddique, A. (2000). Conditional skewness in asset pricing tests. <cite>The Journal of Finance</cite>, 55(3): 1263–1295.</li>
+          <li>Boyer, B., Mitton, T., &amp; Vorkink, K. (2010). Expected idiosyncratic skewness. <cite>The Review of Financial Studies</cite>, 23(1): 169–202.</li>
+          <li>Bali, T. G., Cakici, N., &amp; Whitelaw, R. F. (2011). Maxing out: Stocks as lotteries and the cross-section of expected returns. <cite>Journal of Financial Economics</cite>, 99(2): 427–446.</li>
+          <li>Amihud, Y. (2002). Illiquidity and stock returns: Cross-section and time-series effects. <cite>Journal of Financial Markets</cite>, 5(1): 31–56.</li>
+          <li><a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Kenneth R. French：Data Library（含動能因子 Mom 的歷史報酬）</a></li>
+        </ul>
+      </section>
+
+      <nav id="lesson-nav" aria-label="上一講與下一講"></nav>
+    </article>
+
+    <aside class="toc-wrap" aria-label="本講目錄">
+      <nav id="toc"></nav>
+    </aside>
+  </main>
+
+  <footer id="site-footer"></footer>
+</body>
+</html>

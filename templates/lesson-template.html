@@ -1,0 +1,94 @@
+<!doctype html>
+<!--
+  講義模板（請勿直接修改此檔來寫講義）
+  使用方式：複製到 lessons/<課程 id>/<NN>-<slug>.html，再把所有 {{...}} 取代掉。
+  完整規則見 AGENTS.md §5、§7。
+  - data-root：講義放在 lessons/<課程>/ 底下時固定是 "../../"
+  - data-course / data-lesson 必須與 assets/js/catalog.js 中的 id 一致
+  - 五個固定區塊（objectives / content / summary / exercises / resources）的 id 與順序不可更動
+-->
+<html lang="zh-Hant" data-root="../../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{講義標題}}｜{{課程中文名}}｜商學院講義庫</title>
+  <meta name="description" content="{{一句話摘要，與 catalog.js 的 subtitle 相同}}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+  <link rel="stylesheet" href="../../assets/css/style.css">
+  <script src="../../assets/js/catalog.js" defer></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="page-lesson" data-course="{{課程 id}}" data-lesson="{{講義 id}}">
+  <header id="site-header"></header>
+
+  <main class="lesson-layout">
+    <article class="lesson">
+      <nav id="breadcrumb" class="breadcrumb" aria-label="麵包屑"></nav>
+
+      <header class="lesson-header">
+        <p class="lesson-kicker">{{課程代碼}} · Lecture {{NN}} · Week {{週次}}</p>
+        <h1>{{講義標題}}</h1>
+        <p class="lesson-subtitle">{{副標題}}</p>
+        <dl class="lesson-meta">
+          <div><dt>先備知識</dt><dd>{{先備知識}}</dd></div>
+          <div><dt>閱讀時間</dt><dd>約 {{N}} 分鐘</dd></div>
+          <div><dt>最後更新</dt><dd>{{YYYY-MM-DD}}</dd></div>
+        </dl>
+        <p class="source-note">內容來源：{{原始課程與授課教師}}。本頁為學習筆記，以自己的文字重新整理。</p>
+      </header>
+
+      <!-- 區塊 1：學習目標（3～5 點，以動詞開頭） -->
+      <section id="objectives" class="lesson-section">
+        <h2>學習目標</h2>
+        <ol>
+          <li>{{能夠……}}</li>
+        </ol>
+      </section>
+
+      <!-- 區塊 2：內容講解（每個主題一個 h2，必須有英文 id，例如 id="s1-xxx"） -->
+      <section id="content" class="lesson-section">
+        <h2 id="s1-{{slug}}">1. {{主題}}</h2>
+        <p>{{內文}}</p>
+      </section>
+
+      <!-- 區塊 3：重點整理（4～8 點） -->
+      <section id="summary" class="lesson-section">
+        <h2>重點整理</h2>
+        <ul class="key-points">
+          <li>{{重點}}</li>
+        </ul>
+      </section>
+
+      <!-- 區塊 4：小練習（2～4 題，每題都要附解答） -->
+      <section id="exercises" class="lesson-section">
+        <h2>小練習</h2>
+        <div class="exercise">
+          <p class="exercise__q"><strong>Q1.</strong>{{題目}}</p>
+          <details>
+            <summary>查看解答</summary>
+            <p>{{解答與說明}}</p>
+          </details>
+        </div>
+      </section>
+
+      <!-- 區塊 5：延伸資源（參考文獻與資料來源） -->
+      <section id="resources" class="lesson-section">
+        <h2>延伸資源</h2>
+        <ul class="refs">
+          <li>{{作者}} ({{年份}}). {{篇名}}. <cite>{{期刊}}</cite>, {{卷(期)}}: {{頁碼}}.</li>
+        </ul>
+      </section>
+
+      <nav id="lesson-nav" aria-label="上一講與下一講"></nav>
+    </article>
+
+    <aside class="toc-wrap" aria-label="本講目錄">
+      <nav id="toc"></nav>
+    </aside>
+  </main>
+
+  <footer id="site-footer"></footer>
+</body>
+</html>
